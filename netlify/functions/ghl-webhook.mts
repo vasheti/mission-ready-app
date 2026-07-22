@@ -27,7 +27,6 @@ export default async (request: Request, _context: Context) => {
     const response = await fetch(`${supabaseUrl}/rest/v1/webhook_events`, {
       method: "POST",
       headers: {
-        headers: {
   apikey: serviceRoleKey,
   "Content-Type": "application/json",
   Prefer: "return=representation",
