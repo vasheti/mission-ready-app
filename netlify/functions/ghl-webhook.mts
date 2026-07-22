@@ -1,5 +1,6 @@
 import type { Config, Context } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 
 export default async (request: Request, _context: Context) => {
   if (request.method !== "POST") {
@@ -26,6 +27,7 @@ export default async (request: Request, _context: Context) => {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { transport: WebSocket },
   });
 
   const { data, error } = await supabase
