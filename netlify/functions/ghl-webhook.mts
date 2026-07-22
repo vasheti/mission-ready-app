@@ -1,6 +1,4 @@
 import type { Config, Context } from "@netlify/functions";
-import { createClient } from "@supabase/supabase-js";
-import WebSocket from "ws";
 
 export default async (request: Request, _context: Context) => {
   if (request.method !== "POST") {
@@ -25,30 +23,55 @@ export default async (request: Request, _context: Context) => {
   const eventType = String(payload.type ?? payload.eventType ?? "unknown");
   const externalEventId = String(payload.id ?? payload.eventId ?? "") || null;
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    realtime: { transport: WebSocket },
-  });
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/webhook_events`, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        source: "ghl",
+        event_type: eventType,
+        external_event_id: externalEventId,
+        contact_id: contactId,
+        payload,
+        status: "received",
+      }),
+    });
 
-  const { data, error } = await supabase
-    .from("webhook_events")
-    .insert({
-      source: "ghl",
-      event_type: eventType,
-      external_event_id: externalEventId,
-      contact_id: contactId,
-      payload,
-      status: "received",
-    })
-    .select("id,status,received_at")
-    .single();
+    const rawBody = await response.text();
 
-  if (error) {
-    console.error("Failed to persist webhook event", { code: error.code });
-    return Response.json({ error: "webhook_persist_failed" }, { status: 500 });
+    if (!response.ok) {
+      console.error("Failed to persist webhook event", {
+        status: response.status,
+        body: rawBody.slice(0, 500),
+      });
+      return Response.json({ error: "webhook_persist_failed" }, { status: 500 });
+    }
+
+    let rows: Array<{ id: string; status: string; received_at: string }>;
+    try {
+      rows = JSON.parse(rawBody);
+    } catch {
+      console.error("Supabase returned invalid JSON", { body: rawBody.slice(0, 500) });
+      return Response.json({ error: "invalid_supabase_response" }, { status: 502 });
+    }
+
+    const event = rows[0];
+    if (!event) {
+      return Response.json({ error: "missing_inserted_event" }, { status: 502 });
+    }
+
+    return Response.json({ accepted: true, event }, { status: 202 });
+  } catch (error) {
+    console.error("Unhandled webhook persistence error", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return Response.json({ error: "webhook_unhandled_error" }, { status: 500 });
   }
-
-  return Response.json({ accepted: true, event: data }, { status: 202 });
 };
 
 export const config: Config = {
