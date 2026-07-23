@@ -95,8 +95,9 @@ export default async (request: Request, _context: Context) => {
   const supabaseUrl = Netlify.env.get("SUPABASE_URL");
   const serviceRoleKey = Netlify.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const ghlApiToken = Netlify.env.get("GHL_API_TOKEN");
+  const ghlLocationId = Netlify.env.get("GHL_LOCATION_ID");
 
-  if (!supabaseUrl || !serviceRoleKey || !ghlApiToken) {
+  if (!supabaseUrl || !serviceRoleKey || !ghlApiToken || !ghlLocationId) {
     return Response.json({ error: "middleware_not_configured" }, { status: 503 });
   }
 
@@ -162,6 +163,7 @@ export default async (request: Request, _context: Context) => {
         method: "POST",
         headers: ghlHeaders(ghlApiToken),
         body: JSON.stringify({
+          locationId: ghlLocationId,
           properties: {
             "custom_objects.ai_output_record.output_name": `Thank You Note — ${donorName}`,
             "custom_objects.ai_output_record.output_type": outputType,
