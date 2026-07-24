@@ -186,6 +186,7 @@ export default async (request: Request, _context: Context) => {
       method: "POST",
       headers: ghlHeaders(ghlApiToken, "2023-02-21"),
       body: JSON.stringify({
+        locationId: ghlLocationId,
         associationId: AI_OUTPUT_ASSOCIATION_ID,
         firstRecordId: contactId,
         secondRecordId: ghlRecordId,
