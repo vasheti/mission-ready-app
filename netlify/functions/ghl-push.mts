@@ -45,11 +45,11 @@ function supabaseHeaders(serviceRoleKey: string, prefer?: string): HeadersInit {
   };
 }
 
-function ghlHeaders(apiToken: string): HeadersInit {
+function ghlHeaders(apiToken: string, version = "2021-07-28"): HeadersInit {
   return {
     Authorization: `Bearer ${apiToken}`,
     "Content-Type": "application/json",
-    Version: "2021-07-28",
+    Version: version,
   };
 }
 
@@ -161,16 +161,16 @@ export default async (request: Request, _context: Context) => {
       `${GHL_BASE_URL}/objects/custom_objects.ai_output_record/records`,
       {
         method: "POST",
-        headers: ghlHeaders(ghlApiToken),
+        headers: ghlHeaders(ghlApiToken, "2023-02-21"),
         body: JSON.stringify({
           locationId: ghlLocationId,
           properties: {
-            "custom_objects.ai_output_record.output_name": `Thank You Note — ${donorName}`,
-            "custom_objects.ai_output_record.output_type": outputType,
-            "custom_objects.ai_output_record.output_status": "draft",
-            "custom_objects.ai_output_record.generated_content": job.generated_content,
-            "custom_objects.ai_output_record.generated_date": new Date().toISOString().slice(0, 10),
-            "custom_objects.ai_output_record.prompt_version": promptVersion,
+            output_name: `Thank You Note — ${donorName}`,
+            output_type: outputType,
+            output_status: "draft",
+            generated_content: job.generated_content,
+            generated_date: new Date().toISOString().slice(0, 10),
+            prompt_version: promptVersion,
           },
         }),
       },
@@ -184,7 +184,7 @@ export default async (request: Request, _context: Context) => {
 
     const relationResponse = await fetch(`${GHL_BASE_URL}/associations/relations`, {
       method: "POST",
-      headers: ghlHeaders(ghlApiToken),
+      headers: ghlHeaders(ghlApiToken, "2023-02-21"),
       body: JSON.stringify({
         associationId: AI_OUTPUT_ASSOCIATION_ID,
         firstRecordId: contactId,
