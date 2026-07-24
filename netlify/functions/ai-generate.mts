@@ -22,6 +22,10 @@ type OpenAIResponse = {
 
 const PROMPT_VERSION = "thank_you_note_v1";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function buildPromptV1(sourceContext: Record<string, unknown>): string {
   const firstName = String(sourceContext.firstName ?? sourceContext.first_name ?? "the donor");
   const giftAmount = Number(sourceContext.firstGiftAmount ?? sourceContext.first_gift_amount ?? 0);
@@ -86,9 +90,9 @@ export default async (request: Request, _context: Context) => {
   const webhookEventId = String(payload.webhookEventId ?? payload.webhook_event_id ?? "").trim();
   const contactId = String(payload.contactId ?? payload.contact_id ?? "").trim();
   const outputType = String(payload.outputType ?? payload.output_type ?? "thank_you_note").trim();
-  const sourceContext = payload.sourceContext ?? payload.source_context ?? {};
+  let sourceContext = payload.sourceContext ?? payload.source_context ?? {};
 
-  if (!webhookEventId || !contactId || !outputType || typeof sourceContext !== "object") {
+  if (!webhookEventId || !contactId || !outputType || !isRecord(sourceContext)) {
     return Response.json({ error: "missing_required_fields" }, { status: 400 });
   }
 
@@ -100,6 +104,30 @@ export default async (request: Request, _context: Context) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // GHL workflow calls may supply only the webhook event ID. Recover the donor
+  // context from the persisted event so generated copy never falls back to
+  // generic placeholders when the original webhook contained the real values.
+  if (Object.keys(sourceContext).length === 0) {
+    const { data: webhookEvent, error: webhookEventError } = await supabase
+      .from("webhook_events")
+      .select("payload")
+      .eq("id", webhookEventId)
+      .maybeSingle();
+
+    if (webhookEventError) {
+      console.error("Failed to load webhook source context", {
+        code: webhookEventError.code,
+        webhookEventId,
+      });
+      return Response.json({ error: "source_context_fetch_failed" }, { status: 500 });
+    }
+
+    const storedPayload = isRecord(webhookEvent?.payload) ? webhookEvent.payload : {};
+    sourceContext = isRecord(storedPayload.customData)
+      ? storedPayload.customData
+      : storedPayload;
+  }
 
   const { data: existing } = await supabase
     .from("ai_generation_jobs")
